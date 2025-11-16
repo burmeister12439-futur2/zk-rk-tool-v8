@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZK-RK Analyse Tool v8.0 - Multi-Konflikt-Detection</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .version-badge {
+            background: rgba(255,255,255,0.2);
+            padding: 5px 15px;
+            border-radius: 20px;
+            display: inline-block;
+            margin-top: 10px;
+            font-size: 0.9em;
+        }
+        
+        .content {
+            padding: 30px;
+        }
+        
+        .input-section {
+            margin-bottom: 30px;
+        }
+        
+        .input-section label {
+            display: block;
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .input-section textarea {
+            width: 100%;
+            min-height: 200px;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1em;
+            font-family: inherit;
+            transition: border-color 0.3s;
+            resize: vertical;
+        }
+        
+        .input-section textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        button {
+            flex: 1;
+            padding: 15px 30px;
+            font-size: 1.1em;
+            font-weight: 600;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-analyze {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-analyze:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-clear {
+            background: #e0e0e0;
+            color: #333;
+        }
+        
+        .btn-clear:hover {
+            background: #d0d0d0;
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 30px;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .results {
+            display: none;
+        }
+        
+        .conflict-card {
+            background: #f8f9fa;
+            border-left: 5px solid #667eea;
+            padding: 25px;
+            margin-bottom: 20px;
+            border-radius: 10px;
+        }
+        
+        .conflict-card.primary {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+            border-left: 5px solid #764ba2;
+        }
+        
+        .conflict-card.secondary {
+            border-left: 5px solid #95a5a6;
+        }
+        
+        .conflict-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .conflict-rank {
+            background: #667eea;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+        
+        .conflict-rank.primary {
+            background: #764ba2;
+        }
+        
+        .conflict-rank.secondary {
+            background: #95a5a6;
+        }
+        
+        .centrality-score {
+            font-size: 0.9em;
+            color: #666;
+        }
+        
+        .conflict-title {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 15px;
+            line-height: 1.4;
+        }
+        
+        .conflict-details {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+        
+        .detail-item {
+            margin-bottom: 15px;
+        }
+        
+        .detail-label {
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+        
+        .detail-content {
+            color: #555;
+            line-height: 1.6;
+        }
+        
+        .three-yes-check {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .check-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #ccc;
+        }
+        
+        .check-item.yes {
+            border-left-color: #27ae60;
+        }
+        
+        .check-item.no {
+            border-left-color: #e74c3c;
+        }
+        
+        .check-label {
+            font-weight: 600;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .check-status {
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+        
+        .check-status.yes {
+            background: #27ae60;
+            color: white;
+        }
+        
+        .check-status.no {
+            background: #e74c3c;
+            color: white;
+        }
+        
+        .category-badge {
+            display: inline-block;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-weight: 600;
+            margin-top: 15px;
+        }
+        
+        .category-badge.ZENTRAL {
+            background: #27ae60;
+            color: white;
+        }
+        
+        .category-badge.PRÜF {
+            background: #f39c12;
+            color: white;
+        }
+        
+        .category-badge.HINTERGRUND {
+            background: #95a5a6;
+            color: white;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .btn-small {
+            padding: 8px 20px;
+            font-size: 0.9em;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        
+        .btn-save {
+            background: #27ae60;
+            color: white;
+        }
+        
+        .btn-save:hover {
+            background: #229954;
+        }
+        
+        .btn-refine {
+            background: #3498db;
+            color: white;
+        }
+        
+        .btn-refine:hover {
+            background: #2980b9;
+        }
+        
+        .summary-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        
+        .summary-title {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 15px;
+        }
+        
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+        
+        .stat-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 2em;
+            font-weight: 700;
+            color: #667eea;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+        
+        .export-section {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+        
+        .toggle-section {
+            cursor: pointer;
+            background: #e0e0e0;
+            padding: 12px 20px;
+            border-radius: 8px;
+            margin-top: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.3s;
+        }
+        
+        .toggle-section:hover {
+            background: #d0d0d0;
+        }
+        
+        .toggle-icon {
+            transition: transform 0.3s;
+        }
+        
+        .toggle-icon.open {
+            transform: rotate(180deg);
+        }
+        
+        .collapsible-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+        
+        .collapsible-content.open {
+            max-height: 2000px;
+        }
+        
+        .error {
+            background: #e74c3c;
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎯 ZK-RK Analyse Tool</h1>
+            <div class="version-badge">v8.0 - Multi-Konflikt-Detection mit Ranking</div>
+            <p style="margin-top: 15px; font-size: 1.1em;">Identifiziert ALLE Zielkonflikte im Text und rankt sie nach Zentralität</p>
+        </div>
+        
+        <div class="content">
+            <div class="input-section">
+                <label for="policyText">Politiktext zur Analyse eingeben:</label>
+                <textarea 
+                    id="policyText" 
+                    placeholder="Fügen Sie hier den zu analysierenden Politiktext ein. Das Tool wird ALLE identifizierbaren Zielkonflikte finden und nach ihrer Zentralität im Text ranken..."
+                ></textarea>
+                
+                <div class="button-group">
+                    <button class="btn-analyze" onclick="analyzeText()">
+                        🔍 Text analysieren
+                    </button>
+                    <button class="btn-clear" onclick="clearAll()">
+                        🗑️ Alles löschen
+                    </button>
+                </div>
+            </div>
+            
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Analysiere Text und identifiziere Zielkonflikte...</p>
+                <p style="color: #666; margin-top: 10px;">Dies kann einige Momente dauern</p>
+            </div>
+            
+            <div class="error" id="error"></div>
+            
+            <div class="results" id="results">
+                <div class="summary-section">
+                    <div class="summary-title">📊 Analyse-Zusammenfassung</div>
+                    <div class="summary-stats">
+                        <div class="stat-item">
+                            <div class="stat-number" id="totalConflicts">0</div>
+                            <div class="stat-label">Gefundene Konflikte</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-number" id="centralConflicts">0</div>
+                            <div class="stat-label">ZENTRAL</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-number" id="reviewConflicts">0</div>
+                            <div class="stat-label">PRÜF</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-number" id="backgroundConflicts">0</div>
+                            <div class="stat-label">HINTERGRUND</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="primaryConflict"></div>
+                
+                <div class="toggle-section" onclick="toggleSecondary()">
+                    <span><strong>Weitere identifizierte Konflikte</strong> (<span id="secondaryCount">0</span>)</span>
+                    <span class="toggle-icon" id="toggleIcon">▼</span>
+                </div>
+                
+                <div class="collapsible-content" id="secondaryConflicts"></div>
+                
+                <div class="export-section">
+                    <button class="btn-analyze" onclick="exportResults()">
+                        💾 Alle Konflikte als CSV exportieren
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const API_URL = 'https://zk-rk-analysis-production.up.railway.app';
+        let currentResults = null;
+        
+        async function analyzeText() {
+            const text = document.getElementById('policyText').value.trim();
+            
+            if (!text) {
+                showError('Bitte geben Sie einen Text ein.');
+                return;
+            }
+            
+            // UI Updates
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('results').style.display = 'none';
+            document.getElementById('error').style.display = 'none';
+            document.querySelector('.btn-analyze').disabled = true;
+            
+            try {
+                const response = await fetch(`${API_URL}/analyze-multi`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ policy_text: text })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                currentResults = data;
+                displayResults(data);
+                
+            } catch (error) {
+                console.error('Error:', error);
+                showError('Fehler bei der Analyse: ' + error.message);
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+                document.querySelector('.btn-analyze').disabled = false;
+            }
+        }
+        
+        function displayResults(data) {
+            if (!data.conflicts || data.conflicts.length === 0) {
+                showError('Keine Zielkonflikte im Text identifiziert.');
+                return;
+            }
+            
+            // Update summary stats
+            const totalConflicts = data.conflicts.length;
+            const centralCount = data.conflicts.filter(c => c.category === 'ZENTRAL').length;
+            const reviewCount = data.conflicts.filter(c => c.category === 'PRÜF').length;
+            const backgroundCount = data.conflicts.filter(c => c.category === 'HINTERGRUND').length;
+            
+            document.getElementById('totalConflicts').textContent = totalConflicts;
+            document.getElementById('centralConflicts').textContent = centralCount;
+            document.getElementById('reviewConflicts').textContent = reviewCount;
+            document.getElementById('backgroundConflicts').textContent = backgroundCount;
+            
+            // Display primary conflict (highest centrality)
+            const primaryConflict = data.conflicts[0];
+            document.getElementById('primaryConflict').innerHTML = createConflictCard(primaryConflict, 0, true);
+            
+            // Display secondary conflicts
+            const secondaryConflicts = data.conflicts.slice(1);
+            document.getElementById('secondaryCount').textContent = secondaryConflicts.length;
+            
+            const secondaryHTML = secondaryConflicts.map((conflict, index) => 
+                createConflictCard(conflict, index + 1, false)
+            ).join('');
+            
+            document.getElementById('secondaryConflicts').innerHTML = secondaryHTML;
+            
+            document.getElementById('results').style.display = 'block';
+        }
+        
+        function createConflictCard(conflict, index, isPrimary) {
+            const cardClass = isPrimary ? 'primary' : 'secondary';
+            const rankClass = isPrimary ? 'primary' : 'secondary';
+            const rankLabel = isPrimary ? '🏆 HAUPTKONFLIKT' : `#${index + 1}`;
+            
+            return `
+                <div class="conflict-card ${cardClass}">
+                    <div class="conflict-header">
+                        <span class="conflict-rank ${rankClass}">${rankLabel}</span>
+                        <span class="centrality-score">Zentralität: ${(conflict.centrality_score * 100).toFixed(0)}%</span>
+                    </div>
+                    
+                    <div class="conflict-title">${conflict.conflict}</div>
+                    
+                    <div class="category-badge ${conflict.category}">${conflict.category}</div>
+                    
+                    <div class="conflict-details">
+                        <div class="detail-item">
+                            <div class="detail-label">🎯 Funktion A:</div>
+                            <div class="detail-content">${conflict.function_a}</div>
+                        </div>
+                        
+                        <div class="detail-item">
+                            <div class="detail-label">🎯 Funktion B:</div>
+                            <div class="detail-content">${conflict.function_b}</div>
+                        </div>
+                        
+                        <div class="detail-item">
+                            <div class="detail-label">⚡ Implementierungskollision:</div>
+                            <div class="detail-content">${conflict.implementation_collision}</div>
+                        </div>
+                        
+                        <div class="detail-item">
+                            <div class="detail-label">📌 3-YES Bewertung:</div>
+                            <div class="three-yes-check">
+                                <div class="check-item ${conflict.three_yes.system_function ? 'yes' : 'no'}">
+                                    <div class="check-label">
+                                        Systemfunktionalität
+                                        <span class="check-status ${conflict.three_yes.system_function ? 'yes' : 'no'}">
+                                            ${conflict.three_yes.system_function ? 'JA' : 'NEIN'}
+                                        </span>
+                                    </div>
+                                    <div class="detail-content">${conflict.three_yes.system_function_reasoning}</div>
+                                </div>
+                                
+                                <div class="check-item ${conflict.three_yes.implementation_collision ? 'yes' : 'no'}">
+                                    <div class="check-label">
+                                        Implementierungskollision
+                                        <span class="check-status ${conflict.three_yes.implementation_collision ? 'yes' : 'no'}">
+                                            ${conflict.three_yes.implementation_collision ? 'JA' : 'NEIN'}
+                                        </span>
+                                    </div>
+                                    <div class="detail-content">${conflict.three_yes.implementation_reasoning}</div>
+                                </div>
+                                
+                                <div class="check-item ${conflict.three_yes.current_pressure ? 'yes' : 'no'}">
+                                    <div class="check-label">
+                                        Aktueller Druck
+                                        <span class="check-status ${conflict.three_yes.current_pressure ? 'yes' : 'no'}">
+                                            ${conflict.three_yes.current_pressure ? 'JA' : 'NEIN'}
+                                        </span>
+                                    </div>
+                                    <div class="detail-content">${conflict.three_yes.pressure_reasoning}</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="action-buttons">
+                            <button class="btn-small btn-save" onclick="saveConflict(${index})">
+                                💾 Konflikt speichern
+                            </button>
+                            <button class="btn-small btn-refine" onclick="refineConflict(${index})">
+                                ✨ Konflikt schärfen
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function toggleSecondary() {
+            const content = document.getElementById('secondaryConflicts');
+            const icon = document.getElementById('toggleIcon');
+            
+            content.classList.toggle('open');
+            icon.classList.toggle('open');
+        }
+        
+        function saveConflict(index) {
+            if (!currentResults || !currentResults.conflicts[index]) return;
+            
+            const conflict = currentResults.conflicts[index];
+            
+            // Create downloadable data structure
+            const savedData = {
+                timestamp: new Date().toISOString(),
+                conflict: conflict
+            };
+            
+            // For now, just log - later integrate with storage system
+            console.log('Saving conflict:', savedData);
+            alert('Konflikt gespeichert! (Speicherfunktion wird in nächster Version vollständig implementiert)');
+        }
+        
+        function refineConflict(index) {
+            alert('Schärfungs-Dialog wird in der nächsten Iteration implementiert.');
+        }
+        
+        function exportResults() {
+            if (!currentResults || !currentResults.conflicts) return;
+            
+            const csv = convertToCSV(currentResults.conflicts);
+            downloadCSV(csv, 'zk-rk-analyse-multi.csv');
+        }
+        
+        function convertToCSV(conflicts) {
+            const headers = [
+                'Rang',
+                'Zentralität',
+                'Zielkonflikt',
+                'Funktion A',
+                'Funktion B',
+                'Implementierungskollision',
+                'Kategorie',
+                'Systemfunktionalität (3-YES)',
+                'Implementierungskollision (3-YES)',
+                'Aktueller Druck (3-YES)'
+            ];
+            
+            const rows = conflicts.map((c, index) => [
+                index + 1,
+                (c.centrality_score * 100).toFixed(0) + '%',
+                `"${c.conflict}"`,
+                `"${c.function_a}"`,
+                `"${c.function_b}"`,
+                `"${c.implementation_collision}"`,
+                c.category,
+                c.three_yes.system_function ? 'JA' : 'NEIN',
+                c.three_yes.implementation_collision ? 'JA' : 'NEIN',
+                c.three_yes.current_pressure ? 'JA' : 'NEIN'
+            ]);
+            
+            return [headers, ...rows].map(row => row.join(',')).join('\n');
+        }
+        
+        function downloadCSV(csv, filename) {
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            
+            link.setAttribute('href', url);
+            link.setAttribute('download', filename);
+            link.style.visibility = 'hidden';
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        
+        function clearAll() {
+            document.getElementById('policyText').value = '';
+            document.getElementById('results').style.display = 'none';
+            document.getElementById('error').style.display = 'none';
+            currentResults = null;
+        }
+        
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            document.getElementById('results').style.display = 'none';
+        }
+    </script>
+</body>
+</html>
